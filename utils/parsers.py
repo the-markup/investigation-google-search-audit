@@ -1,0 +1,801 @@
+"""
+These are functions that find all possible elements within a Google search
+Leon Yin
+2019-12-11
+
+fix list.
+add OG url to AMP X
+add distinction between reg links and search result links X
+check answer-loadmore
+check richtext with "socialism"
+add element name to element_to_dict
+"""
+
+import re
+from typing import Union
+from typing import Dict, List
+
+from bs4 import BeautifulSoup, element
+from urlexpander import get_domain
+from .config import javascript, google_domains
+
+
+def xpath_soup(element : Union[element.Tag, 
+                               element.NavigableString]) -> str:
+    """Generate xpath from BeautifulSoup4 element."""
+    components = []
+    child = element if element.name else element.parent
+    for parent in child.parents:  # type: bs4.element.Tag
+        siblings = parent.find_all(child.name, recursive=False)
+        components.append(
+            child.name if 1 == len(siblings) else '%s[%d]' % (
+                child.name,
+                next(i for i, s in enumerate(siblings, 1) if s is child)
+                )
+            )
+        child = parent
+    components.reverse()
+    return '/%s' % '/'.join(components)
+
+def element_to_dict(elm : Union[element.Tag, element.NavigableString], 
+                    category : str, 
+                    url : Union[str, bool] = None, 
+                    domain : str = 'google.com') -> Dict:
+    """Structures an element for the dataset"""
+    text = elm.text
+    tag = elm.name
+    xpath = xpath_soup(elm)
+    element_class = '|'.join(elm.get('class', list()))
+    attrs = elm.attrs
+    row = {
+        'text' : text,
+        'link' : url,
+        'domain' : domain,
+        'xpath' : xpath,
+        'element_class' : element_class,
+        'category' : category,
+        'element' : elm,
+        'tag' : tag,
+        'attrs' : attrs
+    }
+        
+    return row
+
+### General parsers
+def link_parser(body : element.Tag) -> List[Dict]:
+    """
+    Parses all a tags with `href` attributes. 
+    Decides if the url is `organic`, or from a Google property
+    such as "youtube" or google ad services.
+    """
+    data = []
+    for elm in body.find_all('a', href=True, 
+                             attrs={'data-amp' : False}):
+        url = elm['href']
+        domain = get_domain(url)
+        category = 'link-google'
+        if url in javascript:
+            domain = 'google.com'
+            category = 'link-javascript'
+        
+        # links to Google Ad services...
+        elif domain[0] == '/':
+            if domain.split('?')[0] == '/aclk': # check this
+                category = 'ads-google_ad_services'
+            domain = 'google.com'
+
+        elif domain == 'googleadservices.com':
+            category = 'ads-google_ad_services'
+#             elm = elm.parent
+
+        elif domain == 'youtube.com':
+            category = 'link-youtube'
+                
+        # get the whole box for organic
+        elif domain not in google_domains + javascript:
+            category = 'organic'
+            if 'data-ved' not in elm.attrs:
+                elm_potential_text = elm.parent.parent.findNext()
+    
+                if any(elm_potential_text.find_all('span', text=True, 
+                                                     recursive=True,
+                                                     attrs={"role" : False,
+                                                            "aria-level" : False})):
+                    
+                    category = 'organic-search_result_2'
+                    elm = elm.parent.parent
+                elif any(elm_potential_text.find_all('div', recursive=True,
+                                                     text = True,
+                                                     attrs={"role" : False,
+                                                            "aria-level" : False})):
+                    print(domain)
+                    print(elm_potential_text.name)
+                    print(elm_potential_text.attrs)
+                    category = 'organic-search_result_3'
+                    elm = elm.parent.parent
+#         elif domain not in google_domains + javascript:
+#             category = 'organic'
+#             if 'data-ved' not in elm.attrs:
+#                 parent = elm.parent.parent
+#                 if not any(x in ','.join(parent.attrs.keys()) for x in ['data-', 'jsname']):
+#                     if any(e for e in parent.find_all('div',
+#                                              recursive=True,
+#                                              text = True,
+#                                              attrs={"role" : False,
+#                                                     "aria-level" : False})):
+#                         elm = parent
+#                         if domain == 'twitter.com':
+#                             category = 'organic-tweet_3a'
+#                             elm = elm.parent
+#                         else:
+#                             category = 'organic-search_result_1' 
+                        
+#                     elif any(e for e in parent.find_all('span',
+#                                              recursive=True,
+#                                              text = True,
+#                                              attrs={"role" : False,
+#                                                     "aria-level" : False})):
+#                         elm = parent.parent
+#                         category = ('organic-search_result_2' 
+#                                      if domain != 'twitter.com'
+#                                      else 'organic-tweet_3b')
+                # tweets
+                elif 'gws-twitter-link' in elm.attrs.get('class', []):
+                    for _ in range(3):
+                        elm = elm.parent
+                    category = 'organic-tweet_1'
+                    
+        row = element_to_dict(elm, url=url, 
+                              domain=domain, 
+                              category=category)
+        data.append(row)  
+    
+    return data
+
+def amp_parser(body : element.Tag) -> List[Dict]:
+    """
+    AMP links which look like regular links.
+    Makes a distinction between search results
+    with text and regular links
+    """
+    data =[]
+    for elm in body.find_all("a", attrs={'data-amp' : True}):
+        category = 'amp-card'
+        url = elm["data-amp"]
+        domain = get_domain(url)
+        parent = elm.parent.parent.parent
+        if (
+            parent.get('jsaction') 
+            or parent.get('data-hveid') 
+            and not elm.parent.parent.get('data-hveid')
+        ):
+            if any(e for e in parent.find_all('div',
+                                                 recursive=True,
+                                                 text = True,
+                                                 attrs={"role" : False,
+                                                        "aria-level" : False})):
+#                 for _ in range(2):
+                elm = parent
+                category = 'amp-search_result_1'
+            elif any(e for e in parent.find_all('span',
+                                                 recursive=True,
+                                                 text = True,
+                                                 attrs={"role" : False,
+                                                        "aria-level" : False,
+                                                        "class" : True})):
+                for _ in range(2):
+                    elm = elm.parent
+                category = 'amp-search_result_2'
+
+        if domain == 'google.com':
+            category += '_google'
+
+        row = element_to_dict(elm, url=url,
+#                               domain=domain,
+                              category=category)
+        data.append(row)
+        
+    return data
+
+def button_parser(body : element.Tag) -> List[Dict]:
+    """
+    Elements that link. Typically an entire element
+    Can caputre a lot, especially when no anchor is called.
+    In this case, it can caputure sport_schedule and sport_standing
+    """
+    data = []
+    for elm in body.find_all(role='link', attrs={'href' : False,
+                                                 'data-href' : False,
+                                                 'jsaction' : True,
+                                                 'data-fp-link' : False}):
+        row = element_to_dict(elm, category='link-button')
+        data.append(row)
+    return data
+
+def links_alt_parser(body: element.Tag) -> List[Dict]:
+    """elements that have a data-href. buttons usually."""
+    data =[]
+    for elm in body.find_all('a', attrs= {'data-href':True}): # remove 'div'
+        row = element_to_dict(elm, category= 'link-google')
+        data.append(row)
+        
+    return data
+
+def load_more_parser(body: element.Tag) -> List[Dict]:
+    """A button that either loads more of a page or gives a popup"""
+    data = []
+    for elm in body.find_all(attrs={'aria-label' : re.compile('^.*More.*$')}):
+        if elm.name == 'span':
+            elm = elm.parent
+        row = element_to_dict(elm, category='link-load_more')
+        data.append(row)
+    return data
+
+def tweet_parser(body : element.Tag) -> List[Dict]:
+    """Full clickable Tweet cards embedded in page"""
+    data = []
+    for elm in body.find_all('div',  attrs={'data-init-vis' : True,
+                                            'data-author' : True,
+                                            'data-hveid' : True}):
+        row = element_to_dict(elm, 
+                              category='organic-tweet_2',
+                              domain='twitter.com')
+        data.append(row)
+    return data                               
+
+def see_all_parser(body : element.Tag) -> List[Dict]:
+    """For "see all" buttons. check this"""
+    data = []
+    for elm in body.find_all("div", attrs={"aria-label" : "See all",
+                                           "jsaction" : True,
+                                           "role" : "button"}):
+        row = element_to_dict(elm, category='link-load_see_all')
+        data.append(row)
+    return data                               
+
+### KNOWLEDGE PANEL misc
+def knowledge_panel_title_parser(body : element.Tag) -> List[Dict]:
+    """The title of knowledge panels that are clickable"""
+    data = []
+    for elm in body.find_all(attrs={"data-ru_q" : True}):
+        row = element_to_dict(elm, category= 'link-knowledge_panel_title')
+        data.append(row)
+    return data
+
+def tab_parser(body : element.Tag) -> List[Dict]:
+    """For tabs, sometimes on knowledge panels. # check this"""
+    data = []
+    for elm in body.find_all(role='tab'): # what if we get rid of 'a'
+        row = element_to_dict(elm, category='link-knowledge_panel_tab')
+        data.append(row)
+    return data
+
+def filter_parser(body : element.Tag) -> List[Dict]:
+    """Checks for filters"""
+    data = []
+    for elm in body.find_all(attrs={"role" : "button", 
+                                    "aria-pressed" : True}):
+        row = element_to_dict(elm, category='link-filter')
+        data.append(row)
+    return data
+
+def post_parser(body : element.Tag) -> List[Dict]:
+    """Posts from the owner of a knowledge panel"""
+    data = []
+    for elm in body.find_all('div', attrs={'role' : 'button',
+                                           'tabindex' : True,
+                                           'jsaction' : re.compile(
+                                              '^fire.enter_gallery_view')}):
+        row = element_to_dict(elm, category='link-knowlege_panel_owner_post')
+        data.append(row)
+    return data
+
+### LOCAL
+def map_img_parser(body : element.Tag) -> List[Dict]:
+    """Image of a Google map search that links to Google maps."""
+    data = []
+    for elm in body.find_all("img", attrs={"alt" : "map expand icon"}):
+        for _ in range(4):
+            elm = elm.parent
+        row = element_to_dict(elm, category='link-google_map')
+        data.append(row)
+    return data
+
+def local_hours_parser(body : element.Tag) -> List[Dict]:
+    """Dropdown of daily hours of operation for a local business."""
+    data = []
+    for elm in body.find_all("div", attrs={'aria-label' : "Hours:"}):
+        elm = elm.parent
+        row = element_to_dict(elm, category='answer-local_hours_expand')
+
+        data.append(row)
+    return data
+
+def local_popular_times_parser(body : element.Tag) -> List[Dict]:
+    """A graph of popular times for local business."""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'aria-label' : re.compile(
+                                "^Histogram showing popular times")}):
+        elm = elm.parent
+        row = element_to_dict(elm, category='answer-local_popular_times')
+        data.append(row)
+    return data
+
+def local_map_result_parser(body : element.Tag) -> List[Dict]:
+    """Map results with links that go to Goolge maps"""
+    data = []
+    for elm in body.find_all('a', attrs={"data-rc_f" : "rln",
+                                         "data-ru_gwp" : True,
+                                         "jsaction" : True}):
+        row = element_to_dict(elm, category='link-local_google_maps_results')
+        data.append(row)
+    return data
+    
+def local_qa_parser(body : element.Tag) -> List[Dict]:
+    """Q&A for local business"""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : re.compile(
+                                 '^kc:/local:place')}):
+        row = element_to_dict(elm, category='link-local_questions')
+        data.append(row)
+    return data
+
+def local_menu_parser(body : element.Tag) -> List[Dict]:
+    """Links to a Food menu hosted on Google"""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : re.compile(
+                                 '^kc:/local:menu')}):
+        row = element_to_dict(elm, category='link-local_menu')
+        data.append(row)
+    return data  
+
+def local_details_parser(body : element.Tag) -> List[Dict]:
+    """A click-able blurb about a local result."""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : re.compile(
+                                 '^kc:/local:scalable attributes')}):
+        row = element_to_dict(elm, category='answer-local_description')
+        data.append(row)
+    return data
+
+def trailer_parser(body : element.Tag) -> List[Dict]:
+    """For trailer images in Movie knowledge panels."""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : 'kc:/media_common/media_item:video_clips',
+                                   'lang' : True,
+                                    'data-md' : True}):
+        for thumb in elm.find_all('div', 
+                                  attrs={'role' : 'button',
+                                         'data-logged' : True,
+                                         'data-index' : True,
+                                         'style' : True}):
+            row = element_to_dict(thumb, category='answer-trailer')
+            data.append(row)
+    return data
+
+def youtube_parser(body):
+    """For embedded videos"""
+    data = []
+    for video in body.find_all("inline-video",
+                               attrs = {'data-video-id' : True}):
+        row = element_to_dict(video, 
+                              category='link-youtube',
+                              domain='youtube.com')
+        data.append(row)
+    return data
+    
+### ANSWERS
+def featured_snippet_parser(body : element.Tag) -> List[Dict]:
+    """Featured snippet. Highlights the entire box"""
+    data = []
+    for elm in body.find_all('h2', text= 'Featured snippet from the web'):
+        elm = elm.parent
+        for span in elm.find_all('span', recursive=True, attrs={'class' : True}):
+            if span.text:
+                row = element_to_dict(span, category='answer-feature_snippet')
+                data.append(row)
+#                 break
+        for ul in elm.find_all('ul', recursive=True, attrs={'class' : True}):
+            row = element_to_dict(ul, category='answer-feature_snippet')
+            data.append(row)
+#             break
+            
+    return data
+
+def featured_snippet_answer_short_parser(body : element.Tag) -> List[Dict]:
+    """Gets short answers, like "how many calories are in uranmium"?"""
+    data = []
+    for elm in body.find_all('div', attrs = {'data-tts' : "answers",
+                                             'data-tts-text' : True,
+                                             'class' : True}):
+        if elm.text:
+            row = element_to_dict(elm, category='answer-feature_snippet_answer_short')
+            data.append(row)
+    return data
+
+def rich_text_parser(body : element.Tag) -> List[Dict]:
+    """
+    Answers scraped from the web and presented as a paragraph.
+    Collects the span that houses the text, so area is the rect of the span.
+    Remove "datta-attrid" : False to get all short text answers as well...
+    """
+    data = []
+    for elm in body.find_all('div', attrs={'class' : True,
+                                           'data-md' : True,
+                                           'style' : True,
+                                           'data-attrid' : False,
+                                           'lang' : True}):
+        for span in elm.find_all('span',
+                                 recursive=True):
+            if span.text:
+                if span.text not in ['See results about']:
+                    row = element_to_dict(span, category='answer-richtext')
+                    data.append(row)
+#                     break
+        for ul in elm.find_all('ul', recursive=True, attrs={'class' : True}):
+            row = element_to_dict(ul, category='answer-richtext')
+            data.append(row)
+#             break
+
+    return data
+
+def med_answer_parser(body : element.Tag) -> List[Dict]:
+    """Long answers and descriptions of medical conditions"""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : re.compile(
+                                 "^kc:/medicine/")}):
+        elm = elm.parent.parent
+        row = element_to_dict(elm, category='answer-medical')
+        data.append(row)
+    return data
+
+def date_answer_parser(body : element.Tag) -> List[Dict]:
+    """An answer for a date, like 'When is valentines day?'"""
+    data = []
+    for elm in body.find_all('h2', text='Date Result'):
+        elm = elm.parent.parent
+        row = element_to_dict(elm, category='answer-date')
+        data.append(row)
+    return data
+
+def answer_dropdown_parser(body : element.Tag) -> List[Dict]:
+    """Dropdown answers.. how do these differ?"""
+    data = []
+    for elm in body.find_all('div', 
+                             id=True, jsname=True, 
+                             attrs={'data-async-context-required' : "q"}):
+        row = element_to_dict(elm, category='answer-expand')
+        data.append(row)
+    return data
+    
+def expand_answer_parser(body : element.Tag) -> List[Dict]:
+    """Exapndable answers. Typically leads to more links"""
+    data = []
+    for elm in body.find_all(attrs={'aria-expanded' : 'false',
+                                    'role' : 'button'}):
+        #elm = elm.parent
+        row = element_to_dict(elm, category='answer-expand')
+        data.append(row)
+    return data
+    
+def lyric_parser(body : element.Tag) -> List[Dict]:
+    """Lyrics to songs"""
+    data = []
+    for elm in body.find_all('div',
+                             attrs={'data-attrid' : re.compile(
+                                 '^kc:/music/recording_cluster:lyrics')}):
+        row = element_to_dict(elm, category='answer-lyrics')
+        data.append(row)
+    return data
+        
+def tv_parser(body : element.Tag) -> List[Dict]:
+    """Air time for TV shows"""
+    data = []
+    for elm in body.find_all('div',
+                             attrs={'data-attrid' : re.compile(
+                                 '^kc:/(.*?):livetv')}):
+        row = element_to_dict(elm, category='answer-tv_episodes')
+        data.append(row)
+    return data
+
+def dict_def_parser(body : element.Tag) -> List[Dict]:
+    """Dictionary definitions, gets the whole card."""
+    data = []
+    for elm in body.find_all('div', attrs={'id' : 'dictionary-modules'}):
+        row = element_to_dict(elm, category='answer-dictionary')
+        data.append(row)
+    return data
+        
+def sport_stats_parser(body : element.Tag) -> List[Dict]:
+    """Stats on atheletes."""
+    data = []
+    for elm in body.find_all('div',
+                             attrs={'data-attrid' : re.compile(
+                                 "^kc:/sports/pro_athlete:stats")}):
+        row = element_to_dict(elm, category='answer-sport_stats')
+        data.append(row)
+    return data
+
+def food_nutrition_parser(body : element.Tag) -> List[Dict]:
+    """Nutrition facts, much like the consumer label of physical groceries."""
+    data = []
+    for elm in body.find_all('div',
+                             attrs={'data-attrid' : re.compile(
+                                 "^kc:/food/food:energy")}):
+        elm = elm.parent
+        row = element_to_dict(elm, category='answer-food_nutrients')
+        data.append(row)
+    return data
+
+def quote_parser(body : element.Tag) -> List[Dict]:
+    """A table of quotes by a person"""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : 'kc:/people/person:quote'}):
+        row = element_to_dict(elm, category='answer-quote')
+        data.append(row)
+    return data
+
+def finance_quarterly_financial_parser(body : element.Tag) -> List[Dict]:
+    """A table of financial info"""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : re.compile(
+                                        "^kc:/finance/stock:")}):
+        if "carousel" not in elm.get('data-attrid'):
+            row = element_to_dict(elm, category='answer-finance_stocks')
+            data.append(row)
+    return data
+
+### AD Parsers
+def ads_local_parser(body : element.Tag) -> List[Dict]:
+    """Localized ADs"""
+    data = []
+    for elm in body.find_all('li', 
+                             attrs={'class' : re.compile("^ads-")}):
+        row = element_to_dict(elm, category='ads-text')
+        data.append(row)
+    return data
+  
+def ads_general_parser(body : element.Tag) -> List[Dict]:
+    """Catches ADs with a disclaimer and transparency button"""
+    data = []
+    xpath_body = xpath_soup(body)
+    for elm in body.find_all('div', attrs={'aria-label' : 'Why these ads?'}):
+        for _ in range(6):
+            if xpath_soup(elm.parent) != xpath_body:
+                elm = elm.parent
+        row = element_to_dict(elm, category='ads-general')
+        data.append(row)
+    return data
+
+def ads_aria_parser(body : element.Tag) -> List[Dict]:
+    """Catches ADs with a accessibility features"""
+    data = []
+    for elm in body.find_all(attrs={'aria-label' : 'Ad'}):
+        row = element_to_dict(elm, category='ads-aria')
+        data.append(row)
+    return data
+    
+def ads_product_refinements_parser(body : element.Tag) -> List[Dict]:
+    """ads for products with filters."""
+    data = []
+    for elm in body.find_all('h3', text="Suggested Refinements"):
+        for _ in range(2):
+            elm = elm.parent
+        row = element_to_dict(elm, category='ads-filter_product_refinement')
+        data.append(row)
+    return data
+
+def ads_product_parser(body : element.Tag) -> List[Dict]:
+    """Product Ads see "best blenders"."""
+    data = []
+    for elm in body.find_all("g-inner-card", 
+                             attrs={'data-premium' : "1",
+                                    'class' : True,
+                                    'jsname' : True}):
+        elm = elm.parent
+        row = element_to_dict(elm, category='ads-product')
+        data.append(row)
+    return data
+
+def ads_gws_refinement_parser(body : element.Tag) -> List[Dict]:
+    """Typically for filters on product refinement"""
+    data = []
+    for elm in body.find_all("g-inner-card", 
+                             attrs={'jsaction' : 'fire.refinement_click',
+                                    'role' : 'button',
+                                    'data-premium' : False,
+                                    'class' : True}):
+        elm = elm.parent
+        row = element_to_dict(elm, category='ads-filter_refinement')
+        data.append(row)
+    return data
+
+def product_refinement_parser(body : element.Tag) -> List[Dict]:
+    """Another drop down button to filter sponsored products"""
+    data = []
+    for elm in body.find_all("span",
+                             attrs={'class' : True, 'jscontroller': True, 
+                                    'data-immersive' : True, 
+                                    'jsaction' : re.compile("^menu_item_selected")}):
+        row = element_to_dict(elm, category='ads-filter_product')
+        data.append(row)
+    return data
+
+### MISC products
+def rating_parser(body : element.Tag) -> List[Dict]:
+    """Ratings on Google"""
+    data = []
+    xpath_body = xpath_soup(body)
+
+    for elm in body.find_all('span', 
+                             attrs={"aria-label" : re.compile("^Rated")}):
+        for _ in range(4):
+            if xpath_soup(elm.parent) != xpath_body:
+                elm = elm.parent
+        row = element_to_dict(elm, category='answer-reviews_rating')
+        data.append(row)
+    return data
+
+def reviews_parser(body : element.Tag) -> List[Dict]:
+    """Reviews from users on Google"""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-dtl' :re.compile("DETAILS|REVIEWS")}):
+        for span in elm.parent.find_all('span', 
+                                        recursive = True,
+                                        attrs={'data-hveid' : True}):
+            row = element_to_dict(span, category='answer-product-details')
+            data.append(row)    
+        row = element_to_dict(elm, category='link-reviews_details')
+        data.append(row)    
+    return data
+
+def search_review_parser(body : element.Tag) -> List[Dict]:
+    """Product Reviews from Google"""
+    data = []
+    for elm in body.find_all('button', 
+                             attrs={'class' :re.compile(
+                                 "^.*product_ads.*$")}):
+        row = element_to_dict(elm, category='link-search_reviews')
+        data.append(row)
+    return data
+
+def movie_showtimes_parser(body : element.Tag) -> List[Dict]:
+    """Buttons for movie showtimes, opens a overlay with links."""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'aria-haspopup' : "dialog",
+                                    'role' : 'button'}):
+        row = element_to_dict(elm, category='link-movie_showtimes')
+        data.append(row)
+    return data
+
+def video_top_answers_parser(body : element.Tag) -> List[Dict]:
+    """Recorded answers to common questions, see "Thanksgiving"."""
+    data = []
+    for elm in body.find_all('img',
+                             attrs={'alt' : re.compile("^Video"),
+                                    'jsname' : True}):
+        for _ in range(4):
+            elm = elm.parent
+        row = element_to_dict(elm, category='link-video_top_answer')
+        data.append(row)
+    return data
+
+def ebook_parser(body : element.Tag) -> List[Dict]:
+    data = []
+    for elm in body.find_all('g-expandable-content',
+                             attrs={'jscontroller' : True,
+                                    'jsaction' : True,
+                                    'jsshadow' : True,
+                                    'aria-hidden' : True,
+                                    'data-eb' : True,
+                                    'data-mt' : True,
+                                    'data-quie' : True,
+                                    'data-ved' : True}):
+        for div in elm.find_all('div', recursive=True,
+                                attrs={'class' : True,
+                                       'jsname' : True,
+                                       'role' : 'button',
+                                       'aria-haspopup' :True,
+                                       'tabindex' : True,
+                                       'jsaction' : True}):
+            
+            for e in div.find_all('div', text=True):
+                category = 'organic'
+                if e.text == 'Google Play Books':
+                    category = 'link-google_play_books'
+                row = element_to_dict(div, 
+                                      category=category)
+                data.append(row)
+    return data
+
+def fullpage_popup_parser(body : element.Tag) -> List[Dict]:
+    """A clickthru of a fullpage. See events like "New Years Eve Party"."""
+    data = []
+    for elm in body.find_all('li', attrs={'data-encoded-docid' : True}):
+        row = element_to_dict(elm, category='link-fullpage')
+        data.append(row)
+    return data
+
+def category_bar_parser(body : element.Tag) -> List[Dict]:
+    """A bar with a topic, like "sports"."""
+    data = []
+    for elm in body.find_all('div', 
+                              attrs={'data-iv' : True,
+                                     'data-q' : True,
+                                     'data-ui' : True,
+                                     'role' : 'button'}):
+        row = element_to_dict(elm, category='link-topic')
+        data.append(row)
+    return data
+
+def site_search_parser(body : element.Tag) -> List[Dict]:
+    """Links to a Google search restricted to a site."""
+    data = []
+    for elm in body.find_all('form', attrs={"action" : '/search',
+                                            "data-site" : True}):
+        row = element_to_dict(elm, category='link-site_search')
+        data.append(row)
+    return data
+
+def ugc_parser(body : element.Tag) -> List[Dict]:
+    """user gnerated content, like reviews and tags"""
+    data = []
+    for elm in body.find_all('div',
+                             attrs={'data-attrid' : re.compile('^kc:/ugc:')}):
+        row = element_to_dict(elm, category='answer-ugc')
+        data.append(row)
+    return data
+
+def img_reverse_parser(body : element.Tag) -> List[Dict]:
+    """img elements that call a javascript function for reverse image search"""
+    data = []
+    for elm in body.find_all(attrs={'jsaction' : re.compile('^fire.ivg_o')}):
+        for img in elm.find_all('img', recursive=True):
+            img = img.parent
+            row = element_to_dict(img, category='link-img_reverse')
+            data.append(row)
+            break
+    return data
+
+def link_3d_ar_model_parser(body : element.Tag) -> List[Dict]:
+    """A 3d or AR model, usually of an animal"""
+    data = []
+    for elm in body.find_all("div",
+                             attrs={"data-attrid" : re.compile(".ar:model")}):
+        row = element_to_dict(elm, category='link-3d_ar_model')
+        data.append(row)
+    return data
+
+def movie_parser(body : element.Tag) -> List[Dict]:
+    """Trailers that for a movie embedded on page. Typically quite large."""
+    data = []    
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : re.compile(
+                                 "^kc:/film/film:trailer")}):
+        row = element_to_dict(elm, category='link-movie_trailer')
+        data.append(row)
+    return data
+
+def watchlist_parser(body : element.Tag) -> List[Dict]:
+    """Icons for "watched" and "add to watchlist"."""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : re.compile(
+                                 '^kc:(.*?):media_actions')}):
+        for child in elm.find_all('div', recursive=True,
+                                  attrs={'role' : 'button',
+                                         'jsdata' : True,
+                                         'jscontroller' : True}):
+            row = element_to_dict(child, category='link-watchlist')
+            data.append(row)
+    return data
