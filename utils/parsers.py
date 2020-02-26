@@ -62,7 +62,7 @@ def element_to_dict(elm : Union[element.Tag, element.NavigableString],
     return row
 
 ### General parsers
-def link_parser(body : element.Tag) -> List[Dict]:
+def link_parser(body):
     """
     Parses all a tags with `href` attributes. 
     Decides if the url is `organic`, or from a Google property
@@ -86,64 +86,55 @@ def link_parser(body : element.Tag) -> List[Dict]:
 
         elif domain == 'googleadservices.com':
             category = 'ads-google_ad_services'
-#             elm = elm.parent
-
-        elif domain == 'youtube.com':
-            category = 'link-youtube'
                 
         # get the whole box for organic
-        elif domain not in google_domains + javascript:
+        elif domain not in javascript + ['google.com']:
             category = 'organic'
             if 'data-ved' not in elm.attrs:
-                elm_potential_text = elm.parent.parent.findNext()
-    
-                if any(elm_potential_text.find_all('span', text=True, 
-                                                     recursive=True,
-                                                     attrs={"role" : False,
-                                                            "aria-level" : False})):
-                    
-                    category = 'organic-search_result_2'
-                    elm = elm.parent.parent
-                elif any(elm_potential_text.find_all('div', recursive=True,
-                                                     text = True,
-                                                     attrs={"role" : False,
-                                                            "aria-level" : False})):
-                    print(domain)
-                    print(elm_potential_text.name)
-                    print(elm_potential_text.attrs)
-                    category = 'organic-search_result_3'
-                    elm = elm.parent.parent
-#         elif domain not in google_domains + javascript:
-#             category = 'organic'
-#             if 'data-ved' not in elm.attrs:
-#                 parent = elm.parent.parent
-#                 if not any(x in ','.join(parent.attrs.keys()) for x in ['data-', 'jsname']):
-#                     if any(e for e in parent.find_all('div',
-#                                              recursive=True,
-#                                              text = True,
-#                                              attrs={"role" : False,
-#                                                     "aria-level" : False})):
-#                         elm = parent
-#                         if domain == 'twitter.com':
-#                             category = 'organic-tweet_3a'
-#                             elm = elm.parent
-#                         else:
-#                             category = 'organic-search_result_1' 
+                # get the sibling of the parent of the link
+                elm_potential_text = elm.parent.find_next_sibling('div')
+                if elm_potential_text:
+                    if any(elm_potential_text.find_all('div', recursive=True,
+                                                         text = True,
+                                                         attrs={"role" : False,
+                                                                "aria-level" : False,
+                                                                "jsname" : False})):
+                        category = 'organic-search_result_1a'
+                        elm = elm.parent # limit this
+                        if 'data-ved' not in elm.attrs:
+                            elm = elm.parent
                         
-#                     elif any(e for e in parent.find_all('span',
-#                                              recursive=True,
-#                                              text = True,
-#                                              attrs={"role" : False,
-#                                                     "aria-level" : False})):
-#                         elm = parent.parent
-#                         category = ('organic-search_result_2' 
-#                                      if domain != 'twitter.com'
-#                                      else 'organic-tweet_3b')
+                    elif any(elm_potential_text.find_all('span', recursive=True,
+                                                         text = True,
+                                                         attrs={"role" : False,
+                                                                "aria-level" : False})):
+                        category = 'organic-search_result_1b'
+                        elm = elm.parent.parent
+                else:
+                    elm_potential_text = elm.parent.parent.find_next_sibling('div')
+                    if elm_potential_text:
+                        if any(elm_potential_text.find_all('div', recursive=True,
+                                                         text = True,
+                                                         attrs={"role" : False,
+                                                                "aria-level" : False,
+                                                                "jsname" : False})):
+                            category = 'organic-search_result_2a'
+                            elm = elm.parent.parent.parent
+                            
+                        elif any(elm_potential_text.find_all('span', recursive=True,
+                                                         text = True,
+                                                         attrs={"role" : False,
+                                                                "aria-level" : False})):
+                            category = 'organic-search_result_2b'
+                            elm = elm.parent.parent.parent
                 # tweets
-                elif 'gws-twitter-link' in elm.attrs.get('class', []):
+                if 'gws-twitter-link' in elm.attrs.get('class', []):
                     for _ in range(3):
                         elm = elm.parent
                     category = 'organic-tweet_1'
+        
+        if domain == 'youtube.com':
+            category = 'link-youtube'
                     
         row = element_to_dict(elm, url=url, 
                               domain=domain, 
@@ -151,7 +142,6 @@ def link_parser(body : element.Tag) -> List[Dict]:
         data.append(row)  
     
     return data
-
 def amp_parser(body : element.Tag) -> List[Dict]:
     """
     AMP links which look like regular links.
@@ -174,7 +164,6 @@ def amp_parser(body : element.Tag) -> List[Dict]:
                                                  text = True,
                                                  attrs={"role" : False,
                                                         "aria-level" : False})):
-#                 for _ in range(2):
                 elm = parent
                 category = 'amp-search_result_1'
             elif any(e for e in parent.find_all('span',
@@ -399,11 +388,9 @@ def featured_snippet_parser(body : element.Tag) -> List[Dict]:
             if span.text:
                 row = element_to_dict(span, category='answer-feature_snippet')
                 data.append(row)
-#                 break
         for ul in elm.find_all('ul', recursive=True, attrs={'class' : True}):
             row = element_to_dict(ul, category='answer-feature_snippet')
             data.append(row)
-#             break
             
     return data
 
@@ -436,11 +423,9 @@ def rich_text_parser(body : element.Tag) -> List[Dict]:
                 if span.text not in ['See results about']:
                     row = element_to_dict(span, category='answer-richtext')
                     data.append(row)
-#                     break
         for ul in elm.find_all('ul', recursive=True, attrs={'class' : True}):
             row = element_to_dict(ul, category='answer-richtext')
             data.append(row)
-#             break
 
     return data
 
@@ -640,7 +625,7 @@ def rating_parser(body : element.Tag) -> List[Dict]:
         for _ in range(4):
             if xpath_soup(elm.parent) != xpath_body:
                 elm = elm.parent
-        row = element_to_dict(elm, category='answer-reviews_rating')
+        row = element_to_dict(elm, category='link-reviews_rating')
         data.append(row)
     return data
 
