@@ -4,24 +4,24 @@ import os
 version = '0.0.1'
 is_local = True
 
-if is_local:
-    base_dir = '../data'
-    data_dir_in = f'{base_dir}/raw_input'
-    data_dir_stain = f'{base_dir}/intermediary/v{version}/2_stained_html'
-    data_dir_metadata =  f'{base_dir}/intermediary/v{version}/1_element_metadata'
-#     data_dir_screenshots = f'{base_dir}/screenshots/'
-    data_dir_abstract = f'{base_dir}/intermediary/v{version}/3_abstract_painting'
-    for _dir in [base_dir, data_dir_in,
-                 data_dir_stain, data_dir_metadata, 
-                data_dir_abstract]:
-        os.makedirs(_dir, exist_ok=True)
-else:
-    base_dir = 's3://markup-investigations-google'
-    data_dir_in = f'{base_dir}/searches' 
-    data_dir_stain = f'{base_dir}/processed_data/v{version}/stained_html'
-    data_dir_metadata =  f'{base_dir}/processed_data/v{version}/calculations'
-    data_dir_screenshots = f'{base_dir}/processed_data/v{version}/screenshots'
-    data_dir_abstract = f'{base_dir}/processed_data/v{version}/abstract_stain'
+# if is_local:
+#     base_dir = '../data'
+#     data_dir_in = f'{base_dir}/raw_input'
+#     data_dir_stain = f'{base_dir}/intermediary/v{version}/2_stained_html'
+#     data_dir_metadata =  f'{base_dir}/intermediary/v{version}/1_element_metadata'
+# #     data_dir_screenshots = f'{base_dir}/screenshots/'
+#     data_dir_abstract = f'{base_dir}/intermediary/v{version}/3_abstract_painting'
+#     for _dir in [base_dir, data_dir_in,
+#                  data_dir_stain, data_dir_metadata, 
+#                 data_dir_abstract]:
+#         os.makedirs(_dir, exist_ok=True)
+# else:
+#     base_dir = 's3://markup-investigations-google'
+#     data_dir_in = f'{base_dir}/searches' 
+#     data_dir_stain = f'{base_dir}/processed_data/v{version}/stained_html'
+#     data_dir_metadata =  f'{base_dir}/processed_data/v{version}/calculations'
+#     data_dir_screenshots = f'{base_dir}/processed_data/v{version}/screenshots'
+#     data_dir_abstract = f'{base_dir}/processed_data/v{version}/abstract_stain'
     
 
 # stuff for the selnium client

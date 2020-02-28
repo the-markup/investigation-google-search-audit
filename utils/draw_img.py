@@ -42,12 +42,7 @@ from p5 import (
 from config import (
     width,
     cat2color, 
-    white, 
-    data_dir_in,
-    data_dir_metadata,
-    data_dir_abstract,
-    font_file,
-    is_local
+    white
 )
 
 parser = argparse.ArgumentParser()
@@ -76,7 +71,7 @@ if dir_name:
 
 # read the file
 df = pd.read_json(fn, lines=True)
-
+df.loc[:, 'label'] = df['category'].str.split('-').str.get(0)
 print(len(df))
 
 # What font to use?
@@ -89,7 +84,9 @@ def setup():
         size(img.width, img.height)
     else:
         furthest_element = df.location.str.get('y').max()
-        furthest_element_height = df[df.location.str.get('y') == furthest_element].dimensions.str.get('height')
+        furthest_element_height = df[
+            df.location.str.get('y') == furthest_element
+        ].dimensions.str.get('height').tolist()[0]
         length = int(furthest_element_height + furthest_element + 10)
         size(375, length)
     no_loop()
@@ -100,7 +97,7 @@ def draw():
     
     # draw non-organic elements
     for i, row in df[(df.area_page != 0) & 
-                     (~df.category.isin(['organic', 'ads']))].iterrows():
+                     (~df.label.isin(['organic', 'ads']))].iterrows():
         dimensions = row['dimensions']
         location = row['location']
         category = row['category']
@@ -115,7 +112,7 @@ def draw():
         rect((x, y), w, h)
         
     for i, row in df[(df.area_page != 0) & 
-                     (df.category == 'ads')].iterrows():
+                     (df.label == 'ads')].iterrows():
         dimensions = row['dimensions']
         location = row['location']
         category = row['category']
@@ -131,7 +128,7 @@ def draw():
     
     # draw organic elements
     for i, row in df[(df.area_page != 0) & 
-                     (df.category == 'organic')].iterrows():
+                     (df.label == 'organic')].iterrows():
         dimensions = row['dimensions']
         location = row['location']
         category = row['category']
@@ -144,7 +141,22 @@ def draw():
         
         c = fill(color)
         rect((x, y), w, h)
+    
+    # draw buttons elements
+    for i, row in df[(df.area_page != 0) & 
+                     (df.category == 'link-button')].iterrows():
+        dimensions = row['dimensions']
+        location = row['location']
+        category = row['category']
+        color = cat2color[category.split('-')[0]]
+
+        h = dimensions['height']
+        w = dimensions['width']
+        x = location['x']
+        y = location['y']
         
+        c = fill(color)
+        rect((x, y), w, h)
     
     if fn_img:
         tint(255, 60)

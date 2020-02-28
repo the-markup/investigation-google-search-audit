@@ -206,6 +206,7 @@ class WebAssay:
         """Restarts drivers and display"""
         self.close_driver()
         self._init_browser()
+        self.driver_reset_counter = 0
         time.sleep(2)
         
     def save_source(self, fn : str):
@@ -494,13 +495,12 @@ class GoogleWebAssay(WebAssay):
                                      orient='records',
                                      lines=True)
         # save the stained HTML
-        if isinstance(fn_stained_html, str):
-            with open(fn_stained_html, 'w') as f:
-                f.write(self.driver.page_source)
+#         if isinstance(fn_stained_html, str):
+#             with open(fn_stained_html, 'w') as f:
+#                 f.write(self.driver.page_source)
                 
         # restart the driver after 50 files
         if self.driver_reset_counter:
             self.driver_reset_counter += 1
             if self.driver_reset_counter >= self.reset_driver_after:
                 self.restart_driver()
-                self.driver_reset_counter = 0
