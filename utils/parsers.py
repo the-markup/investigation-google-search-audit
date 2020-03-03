@@ -629,7 +629,7 @@ def ads_gws_refinement_parser(body : element.Tag) -> List[Dict]:
                                     'data-premium' : False,
                                     'class' : True}):
         elm = elm.parent
-        row = element_to_dict(elm, category='google-filter_refinement')
+        row = element_to_dict(elm, category='link-filter_refinement')
         data.append(row)
     return data
 
