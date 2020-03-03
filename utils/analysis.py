@@ -413,10 +413,12 @@ class GoogleWebAssay(WebAssay):
         # read the file into beautiful soup, go directly to search results.
         if fn:
             self.open_local_html(fn)
-            self.input_filestream = open(fn).read()
+            with open(fn, 'r') as f:
+                self.input_filestream = f.read()
         else:
             self.input_filestream = self.driver.page_source
-        soup = BeautifulSoup(self.input_filestream)
+        
+        soup = BeautifulSoup(self.input_filestream, "lxml")
         # Isolate the search results and remove footers and headers .
         for div in soup.find_all("div", {'id' : 'sfooter'}): 
             div.decompose()
@@ -435,8 +437,8 @@ class GoogleWebAssay(WebAssay):
         # remove review ratings from Google links. Links > Reviews
         xpath_links = df[df.category.isin(['link', 'organic'])].xpath.tolist()
         review_rating = google[google.category == 'answer-reviews_rating']
-        google[google.category == 'answer-reviews_rating'] = \
-            hierarchy(review_rating, xpath_links)
+        google.loc[google.category == 'answer-reviews_rating',
+                   google.columns] = hierarchy(review_rating, xpath_links)
         google = google[~google.xpath.isnull()]
         
         # remove organic links from Ads. Ads > Organic links
@@ -495,9 +497,9 @@ class GoogleWebAssay(WebAssay):
                                      orient='records',
                                      lines=True)
         # save the stained HTML
-#         if isinstance(fn_stained_html, str):
-#             with open(fn_stained_html, 'w') as f:
-#                 f.write(self.driver.page_source)
+        if isinstance(fn_stained_html, str):
+            with open(fn_stained_html, 'w') as f:
+                f.write(self.driver.page_source)
                 
         # restart the driver after 50 files
         if self.driver_reset_counter:

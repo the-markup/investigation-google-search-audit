@@ -23,7 +23,7 @@ from bs4 import BeautifulSoup
 from parameterized import parameterized
 
 # the software we're testing is in this directory as `utils`
-sys.path.append('../')
+sys.path.append('..')
 import utils.parsers as P
 
 
@@ -42,8 +42,8 @@ class TestParsers(unittest.TestCase):
     
     If the parser targets exist, the parser will return a list of dictionaries.
     '''
-    data_dir = 'data/local_tests'
-    metadata_dir = 'data/metadata'
+    data_dir = '../data/tests/input'
+    metadata_dir = '../data/tests/output'
     for d in [data_dir, metadata_dir]:
         os.makedirs(d, exist_ok=True)
     
