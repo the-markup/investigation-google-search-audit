@@ -2,13 +2,6 @@
 These are functions that find all possible elements within a Google search
 Leon Yin
 2019-12-11
-
-fix list.
-add OG url to AMP X
-add distinction between reg links and search result links X
-check answer-loadmore
-check richtext with "socialism"
-add element name to element_to_dict
 """
 
 import re
@@ -135,13 +128,18 @@ def link_parser(body):
         
         if domain == 'youtube.com':
             category = 'link-youtube'
-                    
+            
+        elif domain in javascript + ['google.com']:
+            if 'data-merchant-id' in elm.attrs:
+                category = 'ads-merchant'
+                      
         row = element_to_dict(elm, url=url, 
                               domain=domain, 
                               category=category)
         data.append(row)  
     
     return data
+
 def amp_parser(body : element.Tag) -> List[Dict]:
     """
     AMP links which look like regular links.
@@ -155,15 +153,16 @@ def amp_parser(body : element.Tag) -> List[Dict]:
         domain = get_domain(url)
         parent = elm.parent.parent.parent
         if (
-            parent.get('jsaction') 
-            or parent.get('data-hveid') 
+            'data-amp-st' not in elm.attrs
+            and parent.get('role') != 'listitem'
             and not elm.parent.parent.get('data-hveid')
+            
         ):
             if any(e for e in parent.find_all('div',
-                                                 recursive=True,
-                                                 text = True,
-                                                 attrs={"role" : False,
-                                                        "aria-level" : False})):
+                                              recursive=True,
+                                              text = True,
+                                              attrs={"role" : False,
+                                                     "aria-level" : False})):
                 elm = parent
                 category = 'amp-search_result_1'
             elif any(e for e in parent.find_all('span',
@@ -178,9 +177,9 @@ def amp_parser(body : element.Tag) -> List[Dict]:
 
         if domain == 'google.com':
             category += '_google'
-
+        if 'data-amp-st' in elm.attrs:
+            category = 'amp-visual_stories'
         row = element_to_dict(elm, url=url,
-#                               domain=domain,
                               category=category)
         data.append(row)
         
@@ -377,7 +376,30 @@ def youtube_parser(body):
                               domain='youtube.com')
         data.append(row)
     return data
-    
+
+def flights_parser(body : element.Tag) -> List[Dict]:
+    """Featured snippet. Highlights the entire box"""
+    data = []
+    for elm in body.find_all('div',
+                             attrs={'data-fltid' : True,
+                                    'data-flt-ve' : True,
+                                    'role' : 'region'}):
+        row = element_to_dict(elm, 
+                              category='link-flights_1')
+        data.append(row)
+    return data
+
+def flights2_parser(body : element.Tag) -> List[Dict]:
+    """Featured snippet. Highlights the entire box"""
+    data = []
+    for elm in body.find_all('div',
+                             attrs={'data-price-graph-bulk-scroll-size' : True,
+                                    'data-black-unclickable-header' : True}):
+        row = element_to_dict(elm, 
+                              category='link-flights_2')
+        data.append(row)
+    return data
+
 ### ANSWERS
 def featured_snippet_parser(body : element.Tag) -> List[Dict]:
     """Featured snippet. Highlights the entire box"""
@@ -412,11 +434,9 @@ def rich_text_parser(body : element.Tag) -> List[Dict]:
     Remove "datta-attrid" : False to get all short text answers as well...
     """
     data = []
-    for elm in body.find_all('div', attrs={'class' : True,
-                                           'data-md' : True,
-                                           'style' : True,
-                                           'data-attrid' : False,
-                                           'lang' : True}):
+    for elm in body.find_all('div', 
+                             attrs={'jsaction' : re.compile(
+                                 "^desclink:")}):
         for span in elm.find_all('span',
                                  recursive=True):
             if span.text:
@@ -465,6 +485,16 @@ def expand_answer_parser(body : element.Tag) -> List[Dict]:
     for elm in body.find_all(attrs={'aria-expanded' : 'false',
                                     'role' : 'button'}):
         #elm = elm.parent
+        row = element_to_dict(elm, category='answer-expand')
+        data.append(row)
+    return data
+    
+def expanded_answer_parser(body : element.Tag) -> List[Dict]:
+    """Exapnded answers. Typically leads to more links"""
+    data = []
+    for elm in body.find_all('div',
+                             attrs={'aria-expanded' : 'true',
+                                    'role' : 'heading'}):
         row = element_to_dict(elm, category='answer-expand')
         data.append(row)
     return data
@@ -574,7 +604,7 @@ def ads_product_refinements_parser(body : element.Tag) -> List[Dict]:
     for elm in body.find_all('h3', text="Suggested Refinements"):
         for _ in range(2):
             elm = elm.parent
-        row = element_to_dict(elm, category='ads-filter_product_refinement')
+        row = element_to_dict(elm, category='link-filter_product_refinement')
         data.append(row)
     return data
 
@@ -599,7 +629,7 @@ def ads_gws_refinement_parser(body : element.Tag) -> List[Dict]:
                                     'data-premium' : False,
                                     'class' : True}):
         elm = elm.parent
-        row = element_to_dict(elm, category='ads-filter_refinement')
+        row = element_to_dict(elm, category='google-filter_refinement')
         data.append(row)
     return data
 
