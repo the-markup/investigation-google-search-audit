@@ -478,9 +478,10 @@ def knowledge_panel_answer_parser(body : element.Tag) -> List[Dict]:
         for span in elm.parent.find_all('span',
                                         recursive=True):
             if span.text:
-                row = element_to_dict(span, category='answer-knowledge_panel_answer')
-                data.append(row)
-                break
+                if len(span.text) > 50:
+                    row = element_to_dict(span, category='answer-knowledge_panel_answer')
+                    data.append(row)
+                    break
             
     return data
 
