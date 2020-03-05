@@ -80,8 +80,12 @@ def link_parser(body):
         elif domain == 'googleadservices.com':
             category = 'ads-google_ad_services'
                 
-        # get the whole box for organic
         elif domain not in javascript:
+            """
+            This is mostly logic for organic, but it applies to links
+            that are from Google. This is to find then entire element
+            link + hyperlink for search results
+            """
             category = 'organic'
             if 'data-attrid' in elm.parent.attrs:
                 row = element_to_dict(elm, url=url, 
@@ -93,7 +97,6 @@ def link_parser(body):
                 elm_potential_text = elm.parent.find_next_sibling('div')
                 if elm_potential_text and not 'data-attrid' in elm.parent.attrs:
                     if any(elm_potential_text.find_all('div', recursive=True,
-                                                         text = True,
                                                          attrs={"role" : False,
                                                                 "aria-level" : False,
                                                                 "jsname" : False})):
@@ -110,7 +113,7 @@ def link_parser(body):
                         elm = elm.parent.parent
                 else:
                     elm_potential_text = elm.parent.parent.find_next_sibling('div')
-                    if elm_potential_text:
+                    if elm_potential_text and elm.parent.name != 'h3': # this last bit is for knowledge panel
                         if any(elm_potential_text.find_all('div', recursive=True,
                                                          text = True,
                                                          attrs={"role" : False,
@@ -125,20 +128,34 @@ def link_parser(body):
                                                                 "aria-level" : False})):
                             category = 'organic-search_result_2b'
                             elm = elm.parent.parent.parent
+                        elif any(elm_potential_text.find_all('table', recursive=True,
+                                                             attrs={"class" : True})):
+                            category = 'organic-search_result_2c'
+                            elm = elm.parent.parent.parent
                 # tweets
                 if 'gws-twitter-link' in elm.attrs.get('class', []):
                     for _ in range(3):
                         elm = elm.parent
                     category = 'organic-tweet_1'
         
+        # set categories for Google products
         if domain == 'youtube.com':
             category = 'link-youtube'
             
         elif domain in javascript + ['google.com']:
+            category = 'link-google'
             if 'data-merchant-id' in elm.attrs:
                 category = 'ads-merchant'
             elif 'aclk?' in url:
                 category = 'ads-google_ad_services'
+            elif elm.parent.parent.name == 'g-tray-header':
+                for _ in range(2):
+                    elm = elm.parent
+                category = 'link-button_2'
+            elif elm.parent.parent.parent.name == 'g-inner-card' and elm.name == 'a':
+                category = 'link-google'
+                for _ in range(3):
+                    elm = elm.parent
                       
         row = element_to_dict(elm, url=url, 
                               domain=domain, 
@@ -187,7 +204,7 @@ def amp_parser(body : element.Tag) -> List[Dict]:
         if 'data-amp-st' in elm.attrs:
             category = 'amp-visual_stories'
         row = element_to_dict(elm, url=url,
-#                               domain=domain,
+                              domain=domain,
                               category=category)
         data.append(row)
         
@@ -464,18 +481,13 @@ def knowledge_panel_answer_parser(body : element.Tag) -> List[Dict]:
     Remove "datta-attrid" : False to get all short text answers as well...
     """
     data = []
-#     for elm in body.find_all('div', 
-#                              attrs={'data-hveid' : True,
-#                                     'data-attrid' : "description"}):
-#         if any(elm.find_all('h2', attrs={'class' : True})):
-#             row = element_to_dict(elm, category='answer-knowledge_panel_answer')
-#             data.append(row)
     for elm in body.find_all('h2', attrs={'class' : True}):
         if not elm.text:
             continue
         if elm.text != 'Description':
             continue
         for span in elm.parent.find_all('span',
+                                        attrs={'jsslot':False},
                                         recursive=True):
             if span.text:
                 if len(span.text) > 50:
@@ -483,6 +495,23 @@ def knowledge_panel_answer_parser(body : element.Tag) -> List[Dict]:
                     data.append(row)
                     break
             
+    return data
+
+def knowledge_panel_answer_2_parser(body: element.Tag) -> List[Dict]:
+    """
+    Another variant of answers from knowledge panels
+    """
+    data = []
+    for elm in body.find_all('div', attrs={"aria-level" : "3", 
+                                           "role" : "heading",
+                                           "data-hveid" : True,
+                                           "class" : True}):
+        for span in elm.find_all('span',
+                                 recursive=True,  
+                                 attrs={'class' : True}):
+            if span.text:
+                row = element_to_dict(elm, category='answer-knowledge_panel_answer_2')
+                data.append(row)
     return data
 
 def med_answer_parser(body : element.Tag) -> List[Dict]:
@@ -812,7 +841,6 @@ def img_reverse_parser(body : element.Tag) -> List[Dict]:
     data = []
     for elm in body.find_all(attrs={'jsaction' : re.compile('^fire.ivg_o')}):
         for img in elm.find_all('img', recursive=True):
-            img = img.parent
             row = element_to_dict(img, category='link-img_reverse')
             data.append(row)
             break
@@ -852,7 +880,7 @@ def watchlist_parser(body : element.Tag) -> List[Dict]:
     return data
 
 def educational_course_offering_parser(body : element.Tag) -> List[Dict]:
-    """Icons for "watched" and "add to watchlist"."""
+    """Courses offered by an educational insitution."""
     data = []
     for elm in body.find_all('div', 
                              attrs={'data-attrid' : re.compile(
@@ -860,6 +888,32 @@ def educational_course_offering_parser(body : element.Tag) -> List[Dict]:
         for span in elm.find_all('span'):
             row = element_to_dict(span.parent, category='answer-courses')
             data.append(row)
+    return data
+
+def automotive_spec_parser(body : element.Tag) -> List[Dict]:
+    """Specs for automobiles."""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : re.compile(
+                                   '^kc:/automotive/model_year:')}):
+        row = element_to_dict(elm.parent, category='answer-automobile')
+        data.append(row)
+    return data
+
+def health_knowledge_panel_parser(body : element.Tag) -> List[Dict]:
+    """Specs for automobiles."""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'id' : re.compile('^knowledge-health'),
+                                    'data-ved' : True}):
+        for div in elm.find_all('div', text=True, 
+                                attrs={'class' : True,
+                                       'data-ved' : True,
+                                       'jscontroller' : False,
+                                       'jsname' : False}):
+            row = element_to_dict(div, category='answer-knowledge_health')
+            data.append(row)
+            
     return data
 
 

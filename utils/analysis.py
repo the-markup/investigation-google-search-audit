@@ -424,11 +424,16 @@ class GoogleWebAssay(WebAssay):
             div.decompose()
         body = soup.find("div", attrs={'id' : 'cnt'})
         if not body:
+            self.element_metadata = pd.DataFrame()
             self._record_error(fn, 'No body of search result')
             return
+        
         # HTMl -> initial dataframe of element metadata.
         elements = self.identify_elements(body)
         df = pd.DataFrame(elements)
+        if df.empty:
+            self.element_metadata = pd.DataFrame()
+            return
         
         # split the organic elements from other elements
         non_google = df[~df.domain.isin(google_domains)]
@@ -476,6 +481,7 @@ class GoogleWebAssay(WebAssay):
                 return
             else:
                 rect_meta.append(elm_area_meta)
+                
         # Put the area metadata into a dataframe
         df_area = pd.DataFrame(rect_meta)
         if df_area.empty:
