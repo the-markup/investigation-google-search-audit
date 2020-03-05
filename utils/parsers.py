@@ -81,21 +81,26 @@ def link_parser(body):
             category = 'ads-google_ad_services'
                 
         # get the whole box for organic
-        elif domain not in javascript + ['google.com']:
+        elif domain not in javascript:
             category = 'organic'
-            if 'data-ved' not in elm.attrs:
+            if 'data-attrid' in elm.parent.attrs:
+                row = element_to_dict(elm, url=url, 
+                                      domain=domain, 
+                                      category=category)
+                data.append(row)  
+            elif not any(e for e in elm.attrs if e in ['data-ved', 'target']):
                 # get the sibling of the parent of the link
                 elm_potential_text = elm.parent.find_next_sibling('div')
-                if elm_potential_text:
+                if elm_potential_text and not 'data-attrid' in elm.parent.attrs:
                     if any(elm_potential_text.find_all('div', recursive=True,
                                                          text = True,
                                                          attrs={"role" : False,
                                                                 "aria-level" : False,
                                                                 "jsname" : False})):
-                        category = 'organic-search_result_1a'
-                        elm = elm.parent # limit this
-                        if 'data-ved' not in elm.attrs:
-                            elm = elm.parent
+                            category = 'organic-search_result_1a'
+                            elm = elm.parent # limit this
+                            if 'data-ved' not in elm.attrs:
+                                elm = elm.parent
                         
                     elif any(elm_potential_text.find_all('span', recursive=True,
                                                          text = True,
@@ -207,7 +212,7 @@ def links_alt_parser(body: element.Tag) -> List[Dict]:
     """elements that have a data-href. buttons usually."""
     data =[]
     for elm in body.find_all('a', attrs= {'data-href':True}): # remove 'div'
-        row = element_to_dict(elm, category= 'link-google')
+        row = element_to_dict(elm, category= 'link-google_alt')
         data.append(row)
         
     return data
@@ -459,12 +464,24 @@ def knowledge_panel_answer_parser(body : element.Tag) -> List[Dict]:
     Remove "datta-attrid" : False to get all short text answers as well...
     """
     data = []
-    for elm in body.find_all('div', 
-                             attrs={'data-hveid' : True,
-                                    'data-attrid' : "description"}):
-        if any(elm.find_all('h2', attrs={'class' : True})):
-            row = element_to_dict(elm, category='answer-knowledge_panel_answer')
-            data.append(row)
+#     for elm in body.find_all('div', 
+#                              attrs={'data-hveid' : True,
+#                                     'data-attrid' : "description"}):
+#         if any(elm.find_all('h2', attrs={'class' : True})):
+#             row = element_to_dict(elm, category='answer-knowledge_panel_answer')
+#             data.append(row)
+    for elm in body.find_all('h2', attrs={'class' : True}):
+        if not elm.text:
+            continue
+        if elm.text != 'Description':
+            continue
+        for span in elm.parent.find_all('span',
+                                        recursive=True):
+            if span.text:
+                row = element_to_dict(span, category='answer-knowledge_panel_answer')
+                data.append(row)
+                break
+            
     return data
 
 def med_answer_parser(body : element.Tag) -> List[Dict]:
@@ -832,3 +849,16 @@ def watchlist_parser(body : element.Tag) -> List[Dict]:
             row = element_to_dict(child, category='link-watchlist')
             data.append(row)
     return data
+
+def educational_course_offering_parser(body : element.Tag) -> List[Dict]:
+    """Icons for "watched" and "add to watchlist"."""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : re.compile(
+                                   '^/(.*?)/majors')}):
+        for span in elm.find_all('span'):
+            row = element_to_dict(span.parent, category='answer-courses')
+            data.append(row)
+    return data
+
+
