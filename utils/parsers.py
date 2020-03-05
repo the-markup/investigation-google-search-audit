@@ -180,6 +180,7 @@ def amp_parser(body : element.Tag) -> List[Dict]:
         if 'data-amp-st' in elm.attrs:
             category = 'amp-visual_stories'
         row = element_to_dict(elm, url=url,
+#                               domain=domain,
                               category=category)
         data.append(row)
         
@@ -447,6 +448,21 @@ def rich_text_parser(body : element.Tag) -> List[Dict]:
             row = element_to_dict(ul, category='answer-richtext')
             data.append(row)
 
+    return data
+
+def knowledge_panel_answer_parser(body : element.Tag) -> List[Dict]:
+    """
+    Answers scraped from the web and presented as a paragraph.
+    Collects the span that houses the text, so area is the rect of the span.
+    Remove "datta-attrid" : False to get all short text answers as well...
+    """
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-hveid' : True,
+                                    'data-attrid' : "description"}):
+        if any(elm.find_all('h2', attrs={'class' : True})):
+            row = element_to_dict(elm, category='answer-knowledge_panel_answer')
+            data.append(row)
     return data
 
 def med_answer_parser(body : element.Tag) -> List[Dict]:

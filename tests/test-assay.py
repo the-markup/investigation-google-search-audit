@@ -4,6 +4,8 @@ Check the browser's params.
 
 Test that google search works once.
 Then on a set in inputs
+
+Look into jacard distnace
 """
 import os
 import sys
@@ -14,6 +16,10 @@ import inspect
 import glob
 import warnings
 warnings.filterwarnings('ignore')
+
+from tqdm import tqdm
+import pandas as pd
+from pandas.util.testing import assert_frame_equal
 
 sys.path.append('../')
 from utils.config import (
@@ -99,9 +105,7 @@ class TestAssay(unittest.TestCase):
             print(e)
             pass
         self.assertTrue(success)
-        
-    def screenshot(self):
-        pass
+    
     def run_assay(self):
         success = False
         fn = self.files_input[0]
@@ -135,7 +139,7 @@ class TestAssay(unittest.TestCase):
     def test_run_assay_on_files(self):
         success = False        
         try:
-            for fn in self.files_input[1:]:
+            for fn in tqdm(self.files_input[1:]):
                 fn_metadata, _, fn_screenshot, fn_abstract_img = get_context(fn)
                 self.assay.open_local_html(fn)
                 self.assay.screenshot_full(fn_screenshot)
@@ -148,18 +152,32 @@ class TestAssay(unittest.TestCase):
                                   fn_img=fn_screenshot)
                 
             success = True
+            
         except Exception as e:
             print(e)
             pass
         
         self.assertTrue(success)
         
+    def test_comparision(self):
+        for fn in tqdm(self.files_input[1:]):
+            success = False
 
-    def full_run_assay(self):
-        pass
-    def compare_metadata(self):
-        pass
-    
+            fn_metadata, _, fn_screenshot, fn_abstract_img = get_context(fn)
+            fn_comparison = fn_metadata.replace(intermediate_dir, 
+                                                '../data/test/intermediate_comparison')
+            if not os.path.exists(fn_comparison):
+                continue
+            df = pd.read_json(fn_metadata, lines=True).sort_values('xpath').reset_index(drop=True)
+            df_c = pd.read_json(fn_comparison, lines=True).sort_values('xpath').reset_index(drop=True)
+            try:
+                assert_frame_equal(df, df_c)
+                success=True
+            except Exception as e:
+                print(e)
+                pass
+            self.assertTrue(success)
+            
     @classmethod
     def tearDownClass(self):
         """
