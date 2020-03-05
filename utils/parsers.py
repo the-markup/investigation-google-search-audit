@@ -132,6 +132,8 @@ def link_parser(body):
         elif domain in javascript + ['google.com']:
             if 'data-merchant-id' in elm.attrs:
                 category = 'ads-merchant'
+            elif 'aclk?' in url:
+                category = 'ads-google_ad_services'
                       
         row = element_to_dict(elm, url=url, 
                               domain=domain, 
