@@ -1,7 +1,6 @@
 """
-These are functions that find all possible elements within a Google search
+These are functions that find a great deal of different elements within a Google search
 Leon Yin
-2019-12-11
 """
 
 import re
@@ -70,6 +69,9 @@ def link_parser(body):
         if url in javascript:
             domain = 'google.com'
             category = 'link-javascript'
+            # skip call icons
+            if any(elm.find_all('div', text= 'Call')):
+                continue
         
         # links to Google Ad services...
         elif domain[0] == '/':
@@ -79,20 +81,19 @@ def link_parser(body):
 
         elif domain == 'googleadservices.com':
             category = 'ads-google_ad_services'
+    
                 
-        elif domain not in javascript:
+        elif domain not in javascript + ['google.com']:
             """
             This is mostly logic for organic, but it applies to links
             that are from Google. This is to find then entire element
             link + hyperlink for search results
             """
             category = 'organic'
-            if 'data-attrid' in elm.parent.attrs:
-                row = element_to_dict(elm, url=url, 
-                                      domain=domain, 
-                                      category=category)
-                data.append(row)  
-            elif not any(e for e in elm.attrs if e in ['data-ved', 'target']):
+#             if 'data-attrid' in elm.parent.attrs:
+#                 pass
+            if (not any(e for e in elm.attrs if e in ['data-ved', 'target'])
+                  and not any(elm.find_all('g-img', recursive=True))):
                 # get the sibling of the parent of the link
                 elm_potential_text = elm.parent.find_next_sibling('div')
                 if elm_potential_text and not 'data-attrid' in elm.parent.attrs:
@@ -141,6 +142,10 @@ def link_parser(body):
         # set categories for Google products
         if domain == 'youtube.com':
             category = 'link-youtube'
+            if 'tabindex' in elm.attrs:
+                for div in elm.find_all('div'):
+                    elm = div
+                    break
             
         elif domain in javascript + ['google.com']:
             category = 'link-google'
@@ -153,10 +158,10 @@ def link_parser(body):
                     elm = elm.parent
                 category = 'link-button_2'
             elif elm.parent.parent.parent.name == 'g-inner-card' and elm.name == 'a':
-                category = 'link-google'
+                category = 'link-google_2'
                 for _ in range(3):
                     elm = elm.parent
-                      
+                    
         row = element_to_dict(elm, url=url, 
                               domain=domain, 
                               category=category)
@@ -180,23 +185,17 @@ def amp_parser(body : element.Tag) -> List[Dict]:
             'data-amp-st' not in elm.attrs
             and parent.get('role') != 'listitem'
             and not elm.parent.parent.get('data-hveid')
+            and not parent.parent.parent.name == 'g-card'
             
         ):
-            if any(e for e in parent.find_all('div',
-                                              recursive=True,
-                                              text = True,
-                                              attrs={"role" : False,
-                                                     "aria-level" : False})):
-                elm = parent
-                category = 'amp-search_result_1'
-            elif any(e for e in parent.find_all('span',
+            if any(e for e in parent.find_all('span',
                                                  recursive=True,
                                                  text = True,
                                                  attrs={"role" : False,
                                                         "aria-level" : False,
                                                         "class" : True})):
-                for _ in range(2):
-                    elm = elm.parent
+                
+                elm = parent
                 category = 'amp-search_result_2'
 
         if domain == 'google.com':
@@ -426,20 +425,21 @@ def flights2_parser(body : element.Tag) -> List[Dict]:
     return data
 
 ### ANSWERS
-def featured_snippet_parser(body : element.Tag) -> List[Dict]:
-    """Featured snippet. Highlights the entire box"""
-    data = []
-    for elm in body.find_all('h2', text= 'Featured snippet from the web'):
-        elm = elm.parent
-        for span in elm.find_all('span', recursive=True, attrs={'class' : True}):
-            if span.text:
-                row = element_to_dict(span, category='answer-feature_snippet')
-                data.append(row)
-        for ul in elm.find_all('ul', recursive=True, attrs={'class' : True}):
-            row = element_to_dict(ul, category='answer-feature_snippet')
-            data.append(row)
+# def featured_snippet_parser(body : element.Tag) -> List[Dict]:
+#     """Featured snippet. Highlights the entire box"""
+#     data = []
+#     for elm in body.find_all('h2', text= 'Featured snippet from the web'):
+#         elm = elm.parent
+#         for span in elm.find_all('span', recursive=True, attrs={'class' : True}):
+#             # check the span is text, and not the text of a hyperlink.
+#             if span.text and span.parent.name != 'a':
+#                 row = element_to_dict(span, category='answer-feature_snippet_1')
+#                 data.append(row)
+#         for ul in elm.find_all('ul', recursive=True, attrs={'class' : True}):
+#             row = element_to_dict(ul, category='answer-feature_snippet_2')
+#             data.append(row)
             
-    return data
+#     return data
 
 def featured_snippet_answer_short_parser(body : element.Tag) -> List[Dict]:
     """Gets short answers, like "how many calories are in uranmium"?"""
@@ -465,7 +465,9 @@ def rich_text_parser(body : element.Tag) -> List[Dict]:
         for span in elm.find_all('span',
                                  recursive=True):
             if span.text:
-                if span.text not in ['See results about']:
+                if (span.text not in ['See results about']
+                      and not any(span.find_all('a', href=True))
+                      and len(span.text) > 50):
                     row = element_to_dict(span, category='answer-richtext')
                     data.append(row)
         for ul in elm.find_all('ul', recursive=True, attrs={'class' : True}):
@@ -478,7 +480,6 @@ def knowledge_panel_answer_parser(body : element.Tag) -> List[Dict]:
     """
     Answers scraped from the web and presented as a paragraph.
     Collects the span that houses the text, so area is the rect of the span.
-    Remove "datta-attrid" : False to get all short text answers as well...
     """
     data = []
     for elm in body.find_all('h2', attrs={'class' : True}):
@@ -490,8 +491,9 @@ def knowledge_panel_answer_parser(body : element.Tag) -> List[Dict]:
                                         attrs={'jsslot':False},
                                         recursive=True):
             if span.text:
-                if len(span.text) > 50:
-                    row = element_to_dict(span, category='answer-knowledge_panel_answer')
+                if (len(span.text) > 50 and 
+                      not any(span.find_all('a', href=True))):
+                    row = element_to_dict(span, category='answer-knowledge_panel_answer_1')
                     data.append(row)
                     break
             
@@ -534,14 +536,32 @@ def date_answer_parser(body : element.Tag) -> List[Dict]:
         data.append(row)
     return data
 
-def answer_dropdown_parser(body : element.Tag) -> List[Dict]:
-    """Dropdown answers.. how do these differ?"""
+def date_answers_FUTURE_parser(body : element.Tag) -> List[Dict]:
+    """An answer for a date, like 'When is valentines day?'"""
     data = []
     for elm in body.find_all('div', 
-                             id=True, jsname=True, 
-                             attrs={'data-async-context-required' : "q"}):
-        row = element_to_dict(elm, category='answer-expand')
+                             attrs={'data-attrid' : re.compile(
+                                    "^kc:/events/holiday:dates")}):
+        row = element_to_dict(elm, category='answer-date_2')
         data.append(row)
+    return data
+
+def answer_dropdown_parser(body : element.Tag) -> List[Dict]:
+    """Dropdown answers. Typically leads to more links"""
+    data = []
+    for elm in body.find_all('div',  
+                             attrs={'data-async-context-required' : "q",
+                                    'data-jiis' : 'up',
+                                    'data-async-type' : True,
+                                    'id' : True, 
+                                    'jsname' : True}):
+        for div in elm.find_all('div', 
+                                attrs={'role' : 'button',
+                                       'tabindex' : '0',
+                                       'jsaction' : True,
+                                       'data-ved' : True}):
+            row = element_to_dict(div, category='answer-expand_1')
+            data.append(row)
     return data
     
 def expand_answer_parser(body : element.Tag) -> List[Dict]:
@@ -549,8 +569,7 @@ def expand_answer_parser(body : element.Tag) -> List[Dict]:
     data = []
     for elm in body.find_all(attrs={'aria-expanded' : 'false',
                                     'role' : 'button'}):
-        #elm = elm.parent
-        row = element_to_dict(elm, category='answer-expand')
+        row = element_to_dict(elm, category='answer-expand_2')
         data.append(row)
     return data
     
@@ -560,7 +579,7 @@ def expanded_answer_parser(body : element.Tag) -> List[Dict]:
     for elm in body.find_all('div',
                              attrs={'aria-expanded' : 'true',
                                     'role' : 'heading'}):
-        row = element_to_dict(elm, category='answer-expand')
+        row = element_to_dict(elm, category='answer-expand_3')
         data.append(row)
     return data
     
@@ -667,7 +686,7 @@ def ads_product_refinements_parser(body : element.Tag) -> List[Dict]:
     """ads for products with filters."""
     data = []
     for elm in body.find_all('h3', text="Suggested Refinements"):
-        for _ in range(2):
+        for _ in range(1):
             elm = elm.parent
         row = element_to_dict(elm, category='link-filter_product_refinement')
         data.append(row)
@@ -917,3 +936,11 @@ def health_knowledge_panel_parser(body : element.Tag) -> List[Dict]:
     return data
 
 
+def conversion_FUTURE_parser(body : element.Tag) -> List[Dict]:
+    """See "how many ounces in a cup"."""
+    data = []
+    for elm in body.find_all('h2', text='Unit Converter'):
+        row = element_to_dict(elm.parent, category='answer-unit_converter')
+        data.append(row)
+            
+    return data
