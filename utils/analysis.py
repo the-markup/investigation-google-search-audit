@@ -440,9 +440,10 @@ class GoogleWebAssay(WebAssay):
         google = df[df.domain.isin(google_domains)]
 
         # remove review ratings from Google links. Links > Reviews
-        xpath_links = df[df.category.isin(['link', 'organic'])].xpath.tolist()
-        review_rating = google[google.category == 'answer-reviews_rating']
-        google.loc[google.category == 'answer-reviews_rating',
+        xpath_links = df[df.category.str.contains('link') |
+                         df.category.str.contains('organic')].xpath.tolist()
+        review_rating = google[google.category == 'link-reviews_rating']
+        google.loc[google.category == 'link-reviews_rating',
                    google.columns] = hierarchy(review_rating, xpath_links)
         google = google[~google.xpath.isnull()]
         
