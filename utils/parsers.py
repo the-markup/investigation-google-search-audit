@@ -909,29 +909,30 @@ def educational_course_offering_parser(body : element.Tag) -> List[Dict]:
             data.append(row)
     return data
 
-def automotive_spec_parser(body : element.Tag) -> List[Dict]:
-    """Specs for automobiles."""
-    data = []
-    for elm in body.find_all('div', 
-                             attrs={'data-attrid' : re.compile(
-                                   '^kc:/automotive/model_year:')}):
-        row = element_to_dict(elm.parent, category='answer-automobile')
-        data.append(row)
-    return data
+# def automotive_spec_parser(body : element.Tag) -> List[Dict]:
+#     """Specs for automobiles."""
+#     data = []
+#     for elm in body.find_all('div', 
+#                              attrs={'data-attrid' : re.compile(
+#                                    '^kc:/automotive/model_year:')}):
+#         row = element_to_dict(elm.parent, category='answer-automobile')
+#         data.append(row)
+#     return data
 
 def health_knowledge_panel_parser(body : element.Tag) -> List[Dict]:
-    """Specs for automobiles."""
+    """Specs for health."""
     data = []
     for elm in body.find_all('div', 
                              attrs={'id' : re.compile('^knowledge-health'),
                                     'data-ved' : True}):
-        for div in elm.find_all('div', text=True, 
+        for div in elm.find_all('div',
                                 attrs={'class' : True,
                                        'data-ved' : True,
                                        'jscontroller' : False,
                                        'jsname' : False}):
-            row = element_to_dict(div, category='answer-knowledge_health')
-            data.append(row)
+            if div.text:
+                row = element_to_dict(div, category='answer-knowledge_health')
+                data.append(row)
             
     return data
 
