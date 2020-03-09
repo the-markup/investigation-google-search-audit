@@ -69,8 +69,8 @@ def link_parser(body):
         if url in javascript:
             domain = 'google.com'
             category = 'link-javascript'
-            # skip call icons
-            if any(elm.find_all('div', text= 'Call')):
+            # skip call, share, and save icons
+            if any(elm.find_all('div', text=re.compile('Call|Share|Save'))):
                 continue
         
         # links to Google Ad services...
@@ -90,8 +90,6 @@ def link_parser(body):
             link + hyperlink for search results
             """
             category = 'organic'
-#             if 'data-attrid' in elm.parent.attrs:
-#                 pass
             if (not any(e for e in elm.attrs if e in ['data-ved', 'target'])
                   and not any(elm.find_all('g-img', recursive=True))):
                 # get the sibling of the parent of the link
@@ -114,7 +112,7 @@ def link_parser(body):
                         elm = elm.parent.parent
                 else:
                     elm_potential_text = elm.parent.parent.find_next_sibling('div')
-                    if elm_potential_text and elm.parent.name != 'h3': # this last bit is for knowledge panel
+                    if elm_potential_text and elm.parent.name != 'h3':
                         if any(elm_potential_text.find_all('div', recursive=True,
                                                          text = True,
                                                          attrs={"role" : False,
@@ -153,10 +151,10 @@ def link_parser(body):
                 category = 'ads-merchant'
             elif 'aclk?' in url:
                 category = 'ads-google_ad_services'
-            elif elm.parent.parent.name == 'g-tray-header':
-                for _ in range(2):
-                    elm = elm.parent
-                category = 'link-button_2'
+#             elif elm.parent.parent.name == 'g-tray-header':
+#                 for _ in range(2):
+#                     elm = elm.parent
+#                 category = 'link-button_2'
             elif elm.parent.parent.parent.name == 'g-inner-card' and elm.name == 'a':
                 category = 'link-google_2'
                 for _ in range(3):
@@ -181,20 +179,16 @@ def amp_parser(body : element.Tag) -> List[Dict]:
         url = elm["data-amp"]
         domain = get_domain(url)
         parent = elm.parent.parent.parent
-        if (
-            'data-amp-st' not in elm.attrs
-            and parent.get('role') != 'listitem'
-            and not elm.parent.parent.get('data-hveid')
-            and not parent.parent.parent.name == 'g-card'
-            
-        ):
+        if ('data-amp-st' not in elm.attrs
+              and parent.get('role') != 'listitem'
+              and not elm.parent.parent.get('data-hveid')
+              and not parent.parent.parent.name == 'g-card'):
             if any(e for e in parent.find_all('span',
-                                                 recursive=True,
-                                                 text = True,
-                                                 attrs={"role" : False,
+                                               recursive=True,
+                                               text = True,
+                                               attrs={"role" : False,
                                                         "aria-level" : False,
                                                         "class" : True})):
-                
                 elm = parent
                 category = 'amp-search_result_2'
 
@@ -536,7 +530,7 @@ def date_answer_parser(body : element.Tag) -> List[Dict]:
         data.append(row)
     return data
 
-def date_answers_FUTURE_parser(body : element.Tag) -> List[Dict]:
+def date_answers_2_parser(body : element.Tag) -> List[Dict]:
     """An answer for a date, like 'When is valentines day?'"""
     data = []
     for elm in body.find_all('div', 
@@ -685,7 +679,7 @@ def ads_aria_parser(body : element.Tag) -> List[Dict]:
 def ads_product_refinements_parser(body : element.Tag) -> List[Dict]:
     """ads for products with filters."""
     data = []
-    for elm in body.find_all('h3', text="Suggested Refinements"):
+    for elm in body.find_all('h3', text=re.compile("Suggested Refinements|Filters List")):
         for _ in range(1):
             elm = elm.parent
         row = element_to_dict(elm, category='link-filter_product_refinement')
@@ -724,7 +718,7 @@ def product_refinement_parser(body : element.Tag) -> List[Dict]:
                              attrs={'class' : True, 'jscontroller': True, 
                                     'data-immersive' : True, 
                                     'jsaction' : re.compile("^menu_item_selected")}):
-        row = element_to_dict(elm, category='ads-filter_product')
+        row = element_to_dict(elm, category='link-filter_product')
         data.append(row)
     return data
 
@@ -807,7 +801,6 @@ def ebook_parser(body : element.Tag) -> List[Dict]:
                                        'aria-haspopup' :True,
                                        'tabindex' : True,
                                        'jsaction' : True}):
-            
             for e in div.find_all('div', text=True):
                 category = 'organic'
                 if e.text == 'Google Play Books':
@@ -909,16 +902,6 @@ def educational_course_offering_parser(body : element.Tag) -> List[Dict]:
             data.append(row)
     return data
 
-# def automotive_spec_parser(body : element.Tag) -> List[Dict]:
-#     """Specs for automobiles."""
-#     data = []
-#     for elm in body.find_all('div', 
-#                              attrs={'data-attrid' : re.compile(
-#                                    '^kc:/automotive/model_year:')}):
-#         row = element_to_dict(elm.parent, category='answer-automobile')
-#         data.append(row)
-#     return data
-
 def health_knowledge_panel_parser(body : element.Tag) -> List[Dict]:
     """Specs for health."""
     data = []
@@ -932,16 +915,80 @@ def health_knowledge_panel_parser(body : element.Tag) -> List[Dict]:
                                        'jsname' : False}):
             if div.text:
                 row = element_to_dict(div, category='answer-knowledge_health')
-                data.append(row)
-            
+                data.append(row)      
     return data
 
-
-def conversion_FUTURE_parser(body : element.Tag) -> List[Dict]:
+def conversion_parser(body : element.Tag) -> List[Dict]:
     """See "how many ounces in a cup"."""
     data = []
     for elm in body.find_all('h2', text='Unit Converter'):
         row = element_to_dict(elm.parent, category='answer-unit_converter')
-        data.append(row)
-            
+        data.append(row)     
+    return data
+
+def related_local_biz_parser(body : element.Tag) -> List[Dict]:
+    """Additional Google searches for local businesses."""
+    data = []
+    
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : re.compile('^kc:/local:sideways refinements')}):
+        for item in elm.find_all('kp-carousel-item'):
+            for link in item.find_all('a'):
+                row = element_to_dict(link, 
+                                      category='link-local_people_also_search')
+                data.append(row)
+    return data
+
+def sports_table_parser(body : element.Tag) -> List[Dict]:
+    """Tables of sports info"""
+    data = []
+    for elm in body.find_all('g-expandable-content',
+                             attrs = {'aria-hidden' : 'false',
+                                      'style' : True,
+                                      'jscontroller' : True,
+                                      'jsaction' : True}):
+         for table in elm.find_all('table', recursive=True, 
+                                   attrs={'class' : True}):
+            row = element_to_dict(table, 
+                                  category='answer-sports_table')
+            data.append(row)
+    return data
+
+def knowledge_panel_factoids_parser(body : element.Tag) -> List[Dict]:
+    """
+    Factoids parsed from the open web.
+    Only finds those without links, the links will show up as 'link-google' ala the link_parser.
+    """
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'data-attrid' : re.compile('^(kc:|ss:|hw:)'),
+                                    'lang' : True}):
+        for span in elm.find_all('span', recursive=True, 
+                                 attrs={'role' : False, 'aria-level' : False}):
+            if (span.text 
+                  and not any(span.find_all('a')) 
+                  and len(span.text) > 1):
+                # make sure this factoid isn't a false positive.
+                check = span
+                not_under_link = True
+                for _ in range(4):
+                    check = check.parent
+                    if check.name == 'a':
+                        not_under_link = False
+                        break
+                if not_under_link:
+                    row = element_to_dict(span, 
+                                          category='answer-knowledge_graph_factoid')
+                    data.append(row)         
+    return data
+
+def map_parser(body : element.Tag) -> List[Dict]:
+    """Links to a map."""
+    data = []
+    for elm in body.find_all('h2', text='Map Results'):
+        for div in elm.parent.find_all('div', recursive=True,
+                                       attrs={'class' : re.compile('^.*map.*$')}):
+      
+            row = element_to_dict(div, category='link-google_map_2')
+            data.append(row)   
     return data
