@@ -992,3 +992,13 @@ def map_parser(body : element.Tag) -> List[Dict]:
             row = element_to_dict(div, category='link-google_map_2')
             data.append(row)   
     return data
+
+def vote_parser(body : element.Tag) -> List[Dict]:
+    """Sponsored votes."""
+    data = []
+    for elm in body.find_all('div', 
+                             attrs={'jsaction' : re.compile("^submit_votes")}):
+        row = element_to_dict(elm, category='ad-votes')
+        data.append(row)   
+    return data
+        
