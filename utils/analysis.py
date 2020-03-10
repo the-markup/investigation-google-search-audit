@@ -24,7 +24,7 @@ from selenium import webdriver
 from pyvirtualdisplay import Display
 from bs4 import BeautifulSoup, element
 
-
+from timeout import timeout
 from .config import (
     cat2color,
     google_domains 
@@ -398,6 +398,7 @@ class GoogleWebAssay(WebAssay):
         self.error_files.append(error_msg)
         self.element_metadata = pd.DataFrame()
     
+    @timeout(60 * 5)
     def run(self, 
             fn : str = None, 
             fn_metadata : str = None, 
