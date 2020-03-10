@@ -38,6 +38,7 @@ from p5 import (
     tint
 )
 
+from timeout import timeout
 from config import (
     width,
     cat2color, 
@@ -60,8 +61,8 @@ fn_out = args['output']
 fn_img_out = args['output'].replace('.png', '_img.png')
 
 # check if the file exists
-# if os.path.exists(fn_out):
-#     sys.exit()
+if os.path.exists(fn_out):
+    sys.exit()
     
 # make directory
 dir_name = os.path.dirname(fn_out)
@@ -73,8 +74,7 @@ df = pd.read_json(fn, lines=True)
 df.loc[:, 'label'] = df['category'].str.split('-').str.get(0)
 print(len(df))
 
-# What font to use?
-# font = create_font(font_file, 16) 
+
 if fn_img:
     img = load_image(fn_img)
 
@@ -90,6 +90,7 @@ def setup():
         size(375, length)
     no_loop()
 
+@timeout(60 * 5)
 def draw():
     background('#ffffff')
     no_stroke()

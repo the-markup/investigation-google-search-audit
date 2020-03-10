@@ -966,7 +966,7 @@ def knowledge_panel_factoids_parser(body : element.Tag) -> List[Dict]:
         for span in elm.find_all('span', recursive=True, 
                                  attrs={'role' : False, 'aria-level' : False}):
             if (span.text 
-                  and not any(span.find_all('a')) 
+#                   and not any(span.find_all('a')) 
                   and len(span.text) > 1):
                 # make sure this factoid isn't a false positive.
                 check = span
@@ -998,7 +998,7 @@ def vote_parser(body : element.Tag) -> List[Dict]:
     data = []
     for elm in body.find_all('div', 
                              attrs={'jsaction' : re.compile("^submit_votes")}):
-        row = element_to_dict(elm, category='ad-votes')
+        row = element_to_dict(elm, category='ads-votes')
         data.append(row)   
     return data
         
