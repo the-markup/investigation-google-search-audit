@@ -20,7 +20,6 @@ import argparse
 import tempfile
 
 from PIL import Image
-import s3
 import pandas as pd
 from p5 import (
     size, 
