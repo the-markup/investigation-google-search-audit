@@ -151,10 +151,12 @@ def link_parser(body):
                 category = 'ads-merchant'
             elif 'aclk?' in url:
                 category = 'ads-google_ad_services'
-#             elif elm.parent.parent.name == 'g-tray-header':
-#                 for _ in range(2):
-#                     elm = elm.parent
-#                 category = 'link-button_2'
+            elif elm.parent.parent.name == 'g-tray-header':
+                check = elm.parent.parent
+                if 'style' in check.attrs:
+                    for _ in range(2):
+                        elm = elm.parent
+                    category = 'link-button_2'
             elif elm.parent.parent.parent.name == 'g-inner-card' and elm.name == 'a':
                 category = 'link-google_2'
                 for _ in range(3):
@@ -961,16 +963,23 @@ def knowledge_panel_factoids_parser(body : element.Tag) -> List[Dict]:
     """
     data = []
     for elm in body.find_all('div', 
-                             attrs={'data-attrid' : re.compile('^(kc:|ss:|hw:)'),
+                             attrs={'data-attrid' : re.compile('^(kc:|ss:|hw:|okra:)'),
                                     'lang' : True}):
         for span in elm.find_all('span', recursive=True, 
                                  attrs={'role' : False, 'aria-level' : False}):
             if (span.text 
-#                   and not any(span.find_all('a')) 
                   and len(span.text) > 1):
-                # make sure this factoid isn't a false positive.
-                check = span
+                
                 not_under_link = True
+                # make sure the span doesn't have an organic link.
+                for link in span.find_all('a', href=True):
+                    link_domain = get_domain(link['href'])
+                    if (link_domain not in javascript + ['google.com']
+                          and link_domain[0] != '/'):
+                        not_under_link = False
+                        
+                # make sure the span isn't in a link
+                check = span
                 for _ in range(4):
                     check = check.parent
                     if check.name == 'a':
