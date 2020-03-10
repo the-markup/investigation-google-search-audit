@@ -24,7 +24,7 @@ from selenium import webdriver
 from pyvirtualdisplay import Display
 from bs4 import BeautifulSoup, element
 
-from timeout import timeout
+from .timeout import timeout
 from .config import (
     cat2color,
     google_domains 
