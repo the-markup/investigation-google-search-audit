@@ -473,7 +473,11 @@ class GoogleWebAssay(WebAssay):
             elm_area_meta = self.calculate_element_area(xpath)
             # stain things if we assign a color pallete.
             if self.color_palette and stain:
-                color = self.color_palette.get(category.split('-')[0], '#ffffff')
+                cat = category.split('-')[0]
+                color = self.color_palette.get(cat, '#ffffff')
+                if isinstance(stain, str):
+                    if stain != cat:
+                        continue
                 self.stain_element(xpath, color=color, category=category)
             # check that the response is OK. if warpped, quit.
             if not elm_area_meta:
