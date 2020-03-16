@@ -1,0 +1,8 @@
+jupyter_contrib_nbextensions
+bs4
+pandas
+selenium
+p5
+pyvirtualdisplay
+numpy
+tqdm

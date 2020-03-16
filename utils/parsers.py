@@ -139,14 +139,20 @@ def link_parser(body):
         
         # set categories for Google products
         if domain == 'youtube.com':
-            category = 'link-youtube'
+            if 'organic-' in category:
+                category = category.replace('organic-', 'link-youtube_')
+            else:
+                category = 'link-youtube'
             if 'tabindex' in elm.attrs:
                 for div in elm.find_all('div'):
                     elm = div
                     break
             
         elif domain in javascript + ['google.com']:
-            category = 'link-google'
+            if 'organic-' in category:
+                category = category.replace('organic-', 'link-google_')
+            else:
+                category = 'link-google'
             if 'data-merchant-id' in elm.attrs:
                 category = 'ads-merchant'
             elif 'aclk?' in url:
@@ -156,9 +162,15 @@ def link_parser(body):
                 if 'style' in check.attrs:
                     for _ in range(2):
                         elm = elm.parent
-                    category = 'link-button_2'
+                    if 'organic-' in category:
+                        category = category.replace('organic-', 'link-button_2_')
+                    else:
+                        category = 'link-button_2'
             elif elm.parent.parent.parent.name == 'g-inner-card' and elm.name == 'a':
-                category = 'link-google_2'
+                if 'organic-' in category:
+                    category = category.replace('organic-', 'link-google_2_')
+                else:
+                    category = 'link-google_2'
                 for _ in range(3):
                     elm = elm.parent
                     
@@ -392,7 +404,7 @@ def youtube_parser(body):
     for video in body.find_all("inline-video",
                                attrs = {'data-video-id' : True}):
         row = element_to_dict(video, 
-                              category='link-youtube',
+                              category='link-youtube_embed',
                               domain='youtube.com')
         data.append(row)
     return data
