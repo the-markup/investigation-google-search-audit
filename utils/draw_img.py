@@ -77,7 +77,8 @@ print(len(df))
 
 if fn_img:
     img = load_image(fn_img)
-
+    
+@timeout(60 * 5)
 def setup():
     if fn_img:
         size(img.width, img.height)
