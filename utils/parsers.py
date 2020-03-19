@@ -201,10 +201,32 @@ def amp_parser(body : element.Tag) -> List[Dict]:
                                                recursive=True,
                                                text = True,
                                                attrs={"role" : False,
-                                                        "aria-level" : False,
-                                                        "class" : True})):
+                                                      "aria-level" : False,
+                                                      "class" : True}) 
+                   if len(e.text) > 50):
                 elm = parent
                 category = 'amp-search_result_2'
+                
+            else:
+                parent = elm.parent.parent
+                for div in parent.find_all('div',
+                                           recursive=True,
+                                           attrs={"role" : False,
+                                                  'style' : False,
+                                                  'data-ved' : False,
+                                                  'jscontroller' : False,
+                                                  "aria-level" : False,
+                                                  "class" : True}):
+                    if div.text:
+                        elm = parent
+                        category = 'amp-search_result_3'
+                    else:
+                        if any(_ for _ in div.find_all('span',
+                                          text=True, 
+                                          attrs={'class' : True})
+                               if len(_.text) > 50):
+                            elm = parent
+                            category = 'amp-search_result_3b'
 
         if domain == 'google.com':
             category += '_google'
@@ -978,7 +1000,9 @@ def knowledge_panel_factoids_parser(body : element.Tag) -> List[Dict]:
                              attrs={'data-attrid' : re.compile('^(kc:|ss:|hw:|okra:)'),
                                     'lang' : True}):
         for span in elm.find_all('span', recursive=True, 
-                                 attrs={'role' : False, 'aria-level' : False}):
+                                 attrs={'role' : False, 
+                                        'aria-level' : False,
+                                        'jsaction' : False}):
             if (span.text 
                   and len(span.text) > 1):
                 
