@@ -27,9 +27,13 @@ is_local = True
 # stuff for the selnium client
 headless = True
 user_agent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 12_0 like Mac OS X) AppleWebKit/604.1.38 (KHTML, like Gecko) Version/12.0 Mobile/15A372 Safari/604.1'
-width = 375
-height = 812
+width = 375 # width of iPhoneX screen in pixels
+height = 812 # height of iPhoneX screen 
 window_size = (width, height)
+
+# some pixel sizes for analysis
+viewport_width = 363
+header = 160
 
 # color values for stains
 blue = "#6cb1ee"
@@ -41,11 +45,11 @@ black = "#b2b2b2"
 
 # the first word before hyphens in element categories are the keys.
 cat2color = {
-    'link' : yellow,
+    'organic' : black,
     'amp' : blue,
-    'ads' : red,
     'answer' : green,
-    'organic' : black
+    'link' : yellow,
+    'ads' : red,
 }
 
 # opacity = .9

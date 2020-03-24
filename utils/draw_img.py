@@ -170,5 +170,9 @@ def draw():
     # draw reference image
     exit()
 
-if __name__ == '__main__':
+@timeout(60 * 3)
+def main():
     run()
+
+if __name__ == '__main__':
+    main()
