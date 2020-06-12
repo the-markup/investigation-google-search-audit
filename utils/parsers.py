@@ -1,6 +1,10 @@
 """
-These are functions that find a great deal of different elements within a Google search
-Leon Yin
+Google Web Assay Parsers
+========================
+These parsers accept HTML of Google search pages read into BeautifulSoup.
+They return a list of dictionaries containing metadata about each parsed element.
+
+Author: Leon Yin
 """
 
 import re
@@ -455,22 +459,6 @@ def flights2_parser(body : element.Tag) -> List[Dict]:
     return data
 
 ### ANSWERS
-# def featured_snippet_parser(body : element.Tag) -> List[Dict]:
-#     """Featured snippet. Highlights the entire box"""
-#     data = []
-#     for elm in body.find_all('h2', text= 'Featured snippet from the web'):
-#         elm = elm.parent
-#         for span in elm.find_all('span', recursive=True, attrs={'class' : True}):
-#             # check the span is text, and not the text of a hyperlink.
-#             if span.text and span.parent.name != 'a':
-#                 row = element_to_dict(span, category='answer-feature_snippet_1')
-#                 data.append(row)
-#         for ul in elm.find_all('ul', recursive=True, attrs={'class' : True}):
-#             row = element_to_dict(ul, category='answer-feature_snippet_2')
-#             data.append(row)
-            
-#     return data
-
 def featured_snippet_answer_short_parser(body : element.Tag) -> List[Dict]:
     """Gets short answers, like "how many calories are in uranmium"?"""
     data = []

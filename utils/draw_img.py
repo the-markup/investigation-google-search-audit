@@ -1,14 +1,16 @@
 """
 Painting Abstractions
-Leon Yin
+=====================
+These scripts utilized the p5 package to visualize how we
+categorize and stain Google search pages.
 
-Order
-1. Google Answers
-2. Google Links
-3. Ads
-4. Organic
-5. AMP
-6. Google link buttons
+It can operate on a blank canvas, essentially drawing colors to
+represent the real estate for each category.
+
+It can also draw directly on a screenshot to display which 
+element is which cagegory.
+
+Author: Leon Yin
 """
 
 import os
@@ -45,6 +47,7 @@ from config import (
     white
 )
 
+# command line arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('--input', nargs='?', const=1, type=str, 
                     help='What is the filepath for the input JSON?')
