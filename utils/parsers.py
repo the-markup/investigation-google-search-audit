@@ -3,6 +3,7 @@ Google Web Assay Parsers
 ========================
 These parsers accept HTML of Google search pages read into BeautifulSoup.
 They return a list of dictionaries containing metadata about each parsed element.
+These parsers are called when initalizing the GoogleWebAssay class.
 
 Author: Leon Yin
 """
@@ -13,6 +14,7 @@ from typing import Dict, List
 
 from bs4 import BeautifulSoup, element
 from urlexpander import get_domain
+
 from .config import javascript, google_domains
 
 

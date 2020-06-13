@@ -111,6 +111,7 @@ def paint_abstract_representation(fn_metadata, fn_out,
         if fn_img:
             command += ['--img',  fn_img]
         if verbose:
+            command += ['--verbose', '1']
             print(' '.join(command))
         process = Popen(command, stdout=PIPE, stderr=PIPE)
         stdout, stderr = process.communicate()
@@ -118,8 +119,8 @@ def paint_abstract_representation(fn_metadata, fn_out,
         return stdout
     
     
-def calc_area(location : dict,
-              rect : dict,
+def calc_area(rect : dict,
+              location : dict,
               width : int = 1e6,
               height_top : int = 0,
               height_bottom : int = 1e6) -> float:
@@ -133,9 +134,8 @@ def calc_area(location : dict,
         `np.clip` will restrict the given `h` and `w` to
         the bounds of the screen.
         """
-        x = location.get('x')
-        
         # take care of neg values
+        x = location.get('x')
         x = np.clip(x, a_min=0, a_max=1e6)
         y = location.get('y')
         h = rect.get('height')
@@ -151,9 +151,9 @@ def calc_area(location : dict,
         # calculate the width and height (length) of the rectangle and the area.
         rect_w = tr_x - tl_x 
         rect_h = br_y - tr_y
-        rect_a = rect_w * rect_h
+        area = rect_w * rect_h
 
-        return rect_a
+        return area
 
 class WebAssay:
     """
@@ -344,8 +344,10 @@ class WebAssay:
 
         # adjust the dimensions by clipping if necessay. "Area" is the first screen
         if elm.is_displayed():
-            area = calc_area(rect, width=self.width, height_bottom=self.height)
-            area_page = calc_area(rect, width=self.width)
+            area = calc_area(rect, location=rect, 
+                             width=self.width, height_bottom=self.height)
+            area_page = calc_area(rect, location=rect,
+                                  width=self.width)
             meta = {
                 'xpath' : xpath,
                 'dimensions' : elm.size,
