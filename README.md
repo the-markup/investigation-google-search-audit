@@ -64,4 +64,4 @@ The first notebook launches a mobile emulator and illustrates how our parsers wo
 ## Utils
 This folder contains helper functions and code for our spatial web scraping tool.
 
-## Liscense
+## License
