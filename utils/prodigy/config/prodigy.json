@@ -1,0 +1,7 @@
+{
+    "show_stats": true,
+    "show_flag" : true,
+    "instructions" : "config/serp-help.html",
+    "swipe":true,
+    "choice_style": "multiple"
+}
